@@ -1,0 +1,91 @@
+services:
+  watchparty-fixed-ui:
+    image: muaeabudhabi/watchparty-fixed-ui:latest
+    restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+      org.titan.app: watchparty-fixed-ui
+    environment:
+    - NODE_ENV=production
+    - LOG_LEVEL=info
+    - PUID=99
+    - PGID=100
+    - UMASK=022
+    - DATABASE_URL=postgresql://watchparty-fixed-ui:changeme@watchparty-fixed-ui_postgres:5432/watchparty-fixed-ui
+    - REDIS_URL=redis://watchparty-fixed-ui_redis:6379
+    volumes:
+    - /mnt/user/appdata/watchparty-fixed-ui/data:/data
+    - /mnt/user/appdata/watchparty-fixed-ui/config:/config
+    logging:
+      driver: json-file
+      options: &id001
+        max-size: 10m
+        max-file: '3'
+    ports:
+    - 3101:3101
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -sf http://localhost:3101/health || curl -sf http://localhost:3101/healthz
+        || curl -sf http://localhost:3101/ || exit 1
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+    - watchparty-fixed-ui_net
+    depends_on:
+      watchparty-fixed-ui_postgres:
+        condition: service_healthy
+      watchparty-fixed-ui_redis:
+        condition: service_healthy
+  watchparty-fixed-ui_postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+    - POSTGRES_DB=watchparty-fixed-ui
+    - POSTGRES_USER=watchparty-fixed-ui
+    - POSTGRES_PASSWORD=changeme
+    volumes:
+    - watchparty-fixed-ui_postgres_data:/var/lib/postgresql/data
+    networks:
+    - watchparty-fixed-ui_net
+    logging:
+      driver: json-file
+      options: *id001
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-app}
+      interval: 30s
+      timeout: 5s
+      retries: 5
+  watchparty-fixed-ui_redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment: []
+    volumes:
+    - watchparty-fixed-ui_redis_data:/data
+    networks:
+    - watchparty-fixed-ui_net
+    logging:
+      driver: json-file
+      options: *id001
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 30s
+      timeout: 5s
+      retries: 5
+networks:
+  watchparty-fixed-ui_net:
+    driver: bridge
+volumes:
+  watchparty-fixed-ui_data:
+    driver: local
+  watchparty-fixed-ui_postgres_data:
+    driver: local
+  watchparty-fixed-ui_redis_data:
+    driver: local
